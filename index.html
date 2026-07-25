@@ -140,7 +140,27 @@
   .name-btn.done{background:var(--sel);color:#2A2C52;border-color:var(--sel);}
   .name-btn.done::after{content:'✓';margin-left:5px;font-size:11px;opacity:.9;}
   /* 지금 나로 선택된 사람 — 아직 시간을 안 골랐어도 페리윙클로 채움 */
-  .name-btn.active{background:var(--sel);color:#2A2C52;border-color:var(--sel-deep);box-shadow:0 0 0 2px rgba(108,112,196,.35);}
+  .name-btn.active{
+    background:var(--sel);
+    color:#2A2C52;
+    border-color:var(--sel-deep);
+    animation:namebreathe 2.2s ease-in-out infinite;
+  }
+  @keyframes namebreathe{
+    0%,100%{
+      box-shadow:0 0 0 2px rgba(108,112,196,.30), 0 0 0 0 rgba(108,112,196,0);
+      filter:brightness(0.92) saturate(0.95);
+      transform:scale(1);
+    }
+    50%{
+      box-shadow:0 0 0 3px rgba(108,112,196,.85), 0 0 22px 7px rgba(108,112,196,.55);
+      filter:brightness(1.22) saturate(1.15);
+      transform:scale(1.035);
+    }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .name-btn.active{ animation:none; box-shadow:0 0 0 2px rgba(108,112,196,.4); }
+  }
 
   .save-status{font-size:11.5px;font-family:ui-monospace,monospace;color:var(--muted);}
   .save-status.saving{color:var(--muted);}
@@ -452,6 +472,15 @@ function updateNameButtonStyles(){
 }
 
 function selectName(n){
+  if(myName === n){
+    // 같은 이름을 다시 누르면 선택 해제
+    myName = '';
+    openDateStr = null;
+    $('timePanelCard').style.display = 'none';
+    updateNameButtonStyles();
+    renderCalendar();
+    return;
+  }
   myName = n;
   if(!responses[myName]) responses[myName] = {};
   updateNameButtonStyles();
