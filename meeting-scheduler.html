@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
+<meta name="googlebot" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>뒷풀이 일정 정하기</title>
+<style>
+  :root{
+    /* 잉크: 텍스트용 딥 슬레이트블루 (거의 무채색에 가깝게) */
+    --ink:#2E3348;
+    --ink-soft:#5A6178;
+    --muted:#9AA0B0;
+
+    /* 서페이스 */
+    --card:#FFFFFF;
+    --card-inset:#F7F6F2;
+    --line:#E5E2D9;
+    --line-strong:#D2CEC2;
+
+    /* 포인트 블루 (채도 낮춘 페리윙클) */
+    --blue:#7385C4;
+    --blue-soft:#EEF0F9;
+    --blue-deep:#5A6BA8;
+
+    /* 선택 상태 페리윙클 */
+    --sel:#A6A9E3;
+    --sel-deep:#6C70C4;
+    --sel-tint:#EDEEFA;
+
+    /* 버터 */
+    --butter:#F3E7BF;
+    --butter-deep:#E0CB8A;
+
+    --bg-top:#FAF6EA;
+    --bg-bottom:#F2E9D2;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg-bottom);
+    color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    min-height:100vh;
+    padding:22px 14px 60px;
+    -webkit-tap-highlight-color:transparent;
+    position:relative;
+  }
+  /* 워프 그라디언트 배경 — 코너에만 색을 몰아서 중앙 텍스트는 크림톤 유지 */
+  body::before{
+    content:'';
+    position:fixed;
+    inset:0;
+    z-index:-2;
+    background:
+      radial-gradient(52% 46% at 6% -6%,   #E0B94B 0%, transparent 62%),
+      radial-gradient(48% 46% at 102% -4%, #2483A5 0%, transparent 60%),
+      radial-gradient(50% 50% at 108% 34%, #477459 0%, transparent 62%),
+      radial-gradient(46% 42% at -6% 104%, #C45408 0%, transparent 58%),
+      radial-gradient(40% 40% at 96% 100%, #6E9091 0%, transparent 60%),
+      linear-gradient(180deg, #EFE3D1 0%, #E4D5B9 100%);
+    filter:saturate(.92);
+  }
+  /* 그레인 텍스처 */
+  body::after{
+    content:'';
+    position:fixed;
+    inset:0;
+    z-index:-1;
+    opacity:.05;
+    mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  }
+  .wrap{max-width:720px;margin:0 auto;}
+
+  .frame-label{
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+    font-size:10.5px;
+    letter-spacing:.16em;
+    color:var(--sel-deep);
+    text-transform:uppercase;
+  }
+  h1{
+    font-size:27px;
+    margin:6px 0 3px;
+    font-weight:800;
+    letter-spacing:-0.02em;
+    color:var(--ink);
+  }
+  .sub{color:var(--ink-soft);font-size:13px;margin-bottom:20px;line-height:1.5;}
+
+  .card{
+    background:var(--card);
+    color:var(--ink);
+    border:1px solid var(--line);
+    border-radius:16px;
+    padding:18px;
+    margin-bottom:14px;
+    box-shadow:0 2px 10px -4px rgba(46,51,72,0.10);
+  }
+
+  button{
+    border:none;border-radius:10px;
+    padding:11px 16px;
+    font-size:14px;
+    font-weight:700;
+    cursor:pointer;
+    font-family:inherit;
+  }
+  .btn-ghost{background:transparent;color:var(--ink-soft);border:1px solid var(--line-strong);}
+  .btn-ghost:active{transform:scale(0.98);}
+  .btn-ghost.danger{color:#C0564B;border-color:#C0564B;background:#FCF2F0;}
+  .btn-small{padding:7px 12px;font-size:12px;}
+
+  .card-title{font-size:13px;font-weight:800;color:var(--ink);margin-bottom:12px;letter-spacing:-0.01em;}
+  .card-title .hint{color:var(--muted);font-weight:500;font-size:12px;}
+
+  /* 이름 버튼 */
+  .name-grid{display:flex;flex-wrap:wrap;gap:7px;}
+  .name-btn{
+    padding:9px 14px;
+    border-radius:999px;
+    border:1px solid var(--line-strong);
+    background:var(--card);
+    color:var(--ink-soft);
+    font-size:14px;
+    font-weight:700;
+    cursor:pointer;
+    transition:background .12s ease,color .12s ease;
+  }
+  .name-btn:active{transform:scale(0.97);}
+  .name-btn.done{background:var(--sel);color:#2A2C52;border-color:var(--sel);}
+  .name-btn.done::after{content:'✓';margin-left:5px;font-size:11px;opacity:.9;}
+  /* 지금 나로 선택된 사람 — 아직 시간을 안 골랐어도 페리윙클로 채움 */
+  .name-btn.active{background:var(--sel);color:#2A2C52;border-color:var(--sel-deep);box-shadow:0 0 0 2px rgba(108,112,196,.35);}
+
+  .save-status{font-size:11.5px;font-family:ui-monospace,monospace;color:var(--muted);}
+  .save-status.saving{color:var(--muted);}
+  .save-status.ok{color:var(--sel-deep);}
+  .save-status.warn{color:#A97B2E;}
+  .save-status.fail{color:#C0564B;}
+
+  /* 달력 */
+  .cal-month{margin-bottom:14px;}
+  .cal-month:last-child{margin-bottom:0;}
+  .cal-title{font-size:12px;font-weight:800;color:var(--ink-soft);margin-bottom:10px;text-align:center;letter-spacing:.04em;}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;}
+  .cal-dow{font-size:10px;color:var(--muted);text-align:center;padding-bottom:3px;font-family:ui-monospace,monospace;}
+  .cal-day{
+    aspect-ratio:1/1;
+    border-radius:11px;
+    border:1px solid var(--line);
+    background:var(--card-inset);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    font-size:13px;color:var(--ink-soft);
+    cursor:pointer;
+    position:relative;
+  }
+  .cal-day.empty{visibility:hidden;}
+  .cal-day .cnt{font-size:9px;margin-top:1px;font-family:ui-monospace,monospace;font-weight:700;color:var(--sel-deep);}
+  .cal-day.mine::before{
+    content:'';position:absolute;top:5px;right:5px;
+    width:5px;height:5px;border-radius:50%;background:var(--butter-deep);
+  }
+  .cal-day.open{border-color:var(--sel-deep);box-shadow:0 0 0 2px rgba(166,169,227,.40);}
+  .cal-day.full{border-color:var(--butter-deep);box-shadow:inset 0 0 0 2px var(--butter);}
+
+  /* 시간 옵션 패널 */
+  .time-panel-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+  .time-panel-header b{font-size:15px;color:var(--ink);letter-spacing:-0.01em;}
+  .opt-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .opt-btn{
+    padding:14px 12px;
+    border-radius:13px;
+    border:1px solid var(--line-strong);
+    background:var(--card);
+    color:var(--ink);
+    cursor:pointer;
+    text-align:left;
+  }
+  .opt-btn:active{transform:scale(0.98);}
+  .opt-btn .lbl{font-size:14px;font-weight:800;display:block;}
+  .opt-btn .desc{font-size:11px;color:var(--muted);display:block;margin-top:3px;}
+  .opt-btn .desc:empty{display:none;}
+  .opt-btn .cnt{font-size:11px;color:var(--sel-deep);display:block;margin-top:7px;font-family:ui-monospace,monospace;font-weight:700;}
+  .opt-btn.mine{border-color:var(--sel);background:var(--sel);color:#252753;}
+  .opt-btn.mine .desc{color:#4A4D85;}
+  .opt-btn.mine .cnt{color:#33366B;}
+  .opt-btn.full{border-color:var(--butter-deep);background:var(--butter);}
+
+  .custom-box{margin-top:12px;}
+  .custom-box .hour-label{font-size:11.5px;color:var(--muted);margin-bottom:8px;display:block;}
+  .hour-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;}
+  .hour-btn{
+    padding:9px 2px;
+    border-radius:9px;
+    border:1px solid var(--line-strong);
+    background:var(--card-inset);
+    color:var(--ink-soft);
+    font-size:12px;
+    font-family:ui-monospace,SFMono-Regular,monospace;
+    cursor:pointer;
+    text-align:center;
+  }
+  .hour-btn:active{transform:scale(0.95);}
+  .hour-btn.mine{background:var(--sel);border-color:var(--sel);color:#252753;font-weight:700;}
+  .hour-btn .hcnt{display:block;font-size:8.5px;margin-top:1px;color:var(--sel-deep);font-weight:700;}
+  .hour-btn.mine .hcnt{color:#33366B;}
+  .custom-note{font-size:11.5px;color:var(--ink-soft);margin-top:10px;line-height:1.6;}
+  .custom-note b{color:var(--ink);}
+
+  /* 베스트 */
+  .best{background:var(--card);border:1px solid var(--butter-deep);}
+  .best h3{margin:0 0 10px;font-size:12px;color:var(--ink);letter-spacing:.04em;font-weight:800;}
+  .best-item{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--line);font-size:14px;}
+  .best-item:last-child{border-bottom:none;}
+  .best-item b{color:var(--sel-deep);font-family:ui-monospace,monospace;font-size:12.5px;}
+  .empty{color:var(--muted);font-size:13px;text-align:center;padding:14px 0;}
+
+  .footer-note{font-size:11.5px;color:var(--muted);text-align:center;margin-top:18px;line-height:1.6;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="frame-label">SCHEDULE ROLL</div>
+  <h1 id="eventTitle">뒷풀이 일정 정하기!</h1>
+  <div class="sub">이름 고르고 → 달력에서 날짜 탭 → 되는 시간 탭! 끝나면 이름 버튼에 체크가 떠요</div>
+
+  <!-- 이름 선택 -->
+  <div class="card">
+    <div class="card-title">누구세요? <span class="hint" id="doneCount"></span></div>
+    <div class="name-grid" id="nameGrid"></div>
+  </div>
+
+  <div id="mainArea" style="display:none;">
+
+    <div class="card" id="calendarCard">
+      <div class="card-title" id="calHint">되는 날짜를 탭해줘요</div>
+      <div id="calendarWrap"></div>
+    </div>
+
+    <div class="card" id="timePanelCard" style="display:none;">
+      <div class="time-panel-header">
+        <b id="timePanelTitle"></b>
+        <button class="btn-ghost btn-small" id="closeTimePanel">닫기</button>
+      </div>
+      <div class="opt-grid" id="optGrid"></div>
+      <div class="custom-box" id="customBox" style="display:none;">
+        <span class="hour-label">되는 시간을 눌러줘요 (여러 개 가능)</span>
+        <div class="hour-grid" id="hourGrid"></div>
+      </div>
+      <div class="custom-note" id="customNote"></div>
+    </div>
+
+    <div class="card best">
+      <h3>🏆 지금까지 베스트 시간</h3>
+      <div id="bestList"><div class="empty">아직 선택된 시간이 없어요</div></div>
+    </div>
+
+    <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap;">
+      <span class="save-status" id="saveStatus"></span>
+      <span style="display:flex;gap:8px;">
+        <button class="btn-ghost btn-small" id="clearMine">내 선택 전체 지우기</button>
+        <button class="btn-ghost btn-small" id="refreshBtn">새로고침</button>
+      </span>
+    </div>
+  </div>
+
+  <div class="footer-note">
+    링크를 다같이 공유해서 각자 이름 눌러 들어오면 돼요<br>
+    날짜·명단은 고정되어 있어요 — 바뀌면 말해주세요!
+  </div>
+</div>
+
+<script>
+const RESP_KEY = 'responses';
+
+// ── 고정 설정 (설정 UI 없이 여기서 직접 관리) ──
+const config = {
+  title: '뒷풀이 일정 정하기!',
+  names: ['남석','민지','샘이','성민','성우','엘리','용재','우철','정근','정민','주현','진묵','태원'],
+  total: 13,
+  startDate: `${new Date().getFullYear()}-07-26`,
+  endDate: `${new Date().getFullYear()}-08-31`
+};
+
+const CATEGORIES = [
+  {id:'anytime', label:'아무때나', desc:'이 날은 언제든 OK'},
+  {id:'custom', label:'시간 선택', desc:'되는 시간만 고르기'}
+];
+
+let responses = {}; // { [name]: { [dateStr]: {anytime, hours:[0..23], _customOn} } }
+let myName = '';
+let openDateStr = null;
+
+const $ = (id)=>document.getElementById(id);
+const pad = (n)=>n.toString().padStart(2,'0');
+const dowLabel = (d)=>['일','월','화','수','목','금','토'][d];
+
+// 예전 버전(custom: 문자열) 데이터가 섞여 있어도 안 깨지게 정규화
+function getHours(v){
+  if(!v) return [];
+  return Array.isArray(v.hours) ? v.hours : [];
+}
+function hasPick(v){
+  if(!v) return false;
+  return !!(v.anytime || getHours(v).length>0);
+}
+
+// ────────────────────────────────────────────────
+//  저장소 레이어
+//  · JSONBin 설정을 채우면 → 13명 실시간 공유 O
+//  · 비워두면 → 이 브라우저에만 저장 (공유 X)
+// ────────────────────────────────────────────────
+const JSONBIN = {
+  binId: '6a647a4ff5f4af5e29beee7f',
+  key:   '$2a$10$uT9hhnWqMhezOz8hP9gFA.3s2q4n2dLSRolOmrJ9NmkRGK2CTXWGq'
+};
+
+const HAS_CLAUDE_STORAGE = (typeof window !== 'undefined' && window.storage && typeof window.storage.get === 'function');
+const HAS_JSONBIN = !!(JSONBIN.binId && JSONBIN.key);
+
+let saveMode = HAS_JSONBIN ? 'jsonbin' : (HAS_CLAUDE_STORAGE ? 'shared' : 'local');
+let saveState = 'idle';
+
+function setSaveState(state){
+  saveState = state;
+  const el = $('saveStatus');
+  if(!el) return;
+  if(state==='saving'){ el.textContent='저장 중…'; el.className='save-status saving'; }
+  else if(state==='ok'){
+    const shared = (saveMode==='jsonbin' || saveMode==='shared');
+    el.textContent = shared ? '저장됨 · 모두와 공유 중' : '저장됨 (이 브라우저에만 · 공유 안 됨)';
+    el.className = 'save-status ' + (shared ? 'ok' : 'warn');
+  }
+  else if(state==='fail'){ el.textContent='저장 실패 — 새로고침 후 다시 시도해줘요'; el.className='save-status fail'; }
+  else { el.textContent=''; el.className='save-status'; }
+}
+
+// ── 백엔드별 읽기/쓰기 ──
+async function backendGet(){
+  if(saveMode==='jsonbin'){
+    const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN.binId}/latest`, {
+      headers:{ 'X-Master-Key': JSONBIN.key }
+    });
+    if(!res.ok) throw new Error('jsonbin read '+res.status);
+    const j = await res.json();
+    return j.record || {};
+  }
+  if(saveMode==='shared'){
+    const r = await window.storage.get(RESP_KEY, true);
+    return (r && r.value) ? JSON.parse(r.value) : {};
+  }
+  const raw = localStorage.getItem(RESP_KEY);
+  return raw ? JSON.parse(raw) : {};
+}
+
+async function backendSet(data){
+  if(saveMode==='jsonbin'){
+    const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN.binId}`, {
+      method:'PUT',
+      headers:{ 'Content-Type':'application/json', 'X-Master-Key': JSONBIN.key },
+      body: JSON.stringify(data)
+    });
+    if(!res.ok) throw new Error('jsonbin write '+res.status);
+    return;
+  }
+  if(saveMode==='shared'){
+    await window.storage.set(RESP_KEY, JSON.stringify(data), true);
+    return;
+  }
+  localStorage.setItem(RESP_KEY, JSON.stringify(data));
+}
+
+async function loadResponses(){
+  // 실패해도 기존 메모리 데이터를 지우지 않는다
+  try{
+    const data = await backendGet();
+    if(data && typeof data === 'object') responses = data;
+  }catch(e){ /* 현재 상태 유지 */ }
+}
+
+let saveQueued = false, saving = false;
+let lastLocalEdit = 0;
+
+async function saveResponses(){
+  lastLocalEdit = Date.now();
+  if(saving){ saveQueued = true; return; }
+  saving = true;
+  setSaveState('saving');
+  let done = false;
+  try{
+    await backendSet(responses);
+    done = true;
+  }catch(e){
+    try{                      // 한 번 재시도
+      await new Promise(r=>setTimeout(r,500));
+      await backendSet(responses);
+      done = true;
+    }catch(e2){
+      if(saveMode !== 'local'){   // 최후엔 브라우저 저장으로라도 남긴다
+        try{
+          saveMode = 'local';
+          await backendSet(responses);
+          done = true;
+        }catch(e3){}
+      }
+    }
+  }
+  setSaveState(done ? 'ok' : 'fail');
+  saving = false;
+  if(saveQueued){ saveQueued = false; saveResponses(); }
+}
+
+function renderNameButtons(){
+  const grid = $('nameGrid');
+  grid.innerHTML = '';
+  config.names.forEach(n=>{
+    const btn = document.createElement('button');
+    btn.className = 'name-btn';
+    btn.textContent = n;
+    btn.dataset.name = n;
+    btn.addEventListener('click', ()=>selectName(n));
+    grid.appendChild(btn);
+  });
+  updateNameButtonStyles();
+}
+
+function hasAnySelection(name){
+  const d = responses[name];
+  if(!d) return false;
+  return Object.values(d).some(v => hasPick(v));
+}
+
+function updateNameButtonStyles(){
+  document.querySelectorAll('.name-btn').forEach(btn=>{
+    const n = btn.dataset.name;
+    btn.classList.toggle('active', n===myName);
+    btn.classList.toggle('done', hasAnySelection(n));
+  });
+  const doneN = config.names.filter(n=>hasAnySelection(n)).length;
+  $('doneCount').textContent = `(${doneN}/${config.total}명 완료)`;
+}
+
+function selectName(n){
+  myName = n;
+  if(!responses[myName]) responses[myName] = {};
+  $('mainArea').style.display = 'block';
+  updateNameButtonStyles();
+  renderCalendar();
+  if(openDateStr) openDatePanel(openDateStr);
+}
+
+function monthsInRange(cfg){
+  const start = new Date(cfg.startDate+'T00:00:00');
+  const end = new Date(cfg.endDate+'T00:00:00');
+  const months = [];
+  let cur = new Date(start.getFullYear(), start.getMonth(), 1);
+  const last = new Date(end.getFullYear(), end.getMonth(), 1);
+  while(cur <= last){
+    months.push(new Date(cur));
+    cur.setMonth(cur.getMonth()+1);
+  }
+  return months;
+}
+
+function dateAvailCount(dateStr){
+  let n = 0;
+  Object.entries(responses).forEach(([name,byDate])=>{
+    const v = byDate && byDate[dateStr];
+    if(hasPick(v)) n++;
+  });
+  return n;
+}
+
+function renderCalendar(){
+  const wrap = $('calendarWrap');
+  wrap.innerHTML = '';
+  const start = new Date(config.startDate+'T00:00:00');
+  const end = new Date(config.endDate+'T00:00:00');
+  const months = monthsInRange(config);
+
+  months.forEach(monthDate=>{
+    const y = monthDate.getFullYear(), m = monthDate.getMonth();
+    const monthDiv = document.createElement('div');
+    monthDiv.className = 'cal-month';
+    monthDiv.innerHTML = `<div class="cal-title">${y}년 ${m+1}월</div>`;
+    const grid = document.createElement('div');
+    grid.className = 'cal-grid';
+    ['일','월','화','수','목','금','토'].forEach(d=>{
+      const el = document.createElement('div');
+      el.className = 'cal-dow'; el.textContent = d;
+      grid.appendChild(el);
+    });
+    const firstDow = new Date(y,m,1).getDay();
+    const daysInMonth = new Date(y,m+1,0).getDate();
+    for(let i=0;i<firstDow;i++){
+      const el = document.createElement('div'); el.className='cal-day empty';
+      grid.appendChild(el);
+    }
+    for(let day=1; day<=daysInMonth; day++){
+      const dObj = new Date(y,m,day);
+      const dateStr = `${y}-${pad(m+1)}-${pad(day)}`;
+      const inRange = dObj>=new Date(start.getFullYear(),start.getMonth(),start.getDate()) && dObj<=new Date(end.getFullYear(),end.getMonth(),end.getDate());
+      const el = document.createElement('div');
+      el.className = 'cal-day' + (inRange?'':' disabled');
+      if(!inRange) el.style.opacity = '.25';
+      el.dataset.date = dateStr;
+      const cnt = inRange ? dateAvailCount(dateStr) : 0;
+      const myV = responses[myName] && responses[myName][dateStr];
+      const mine = hasPick(myV);
+      if(mine) el.classList.add('mine');
+      if(config.total>0 && cnt>=config.total) el.classList.add('full');
+      if(openDateStr===dateStr) el.classList.add('open');
+      if(inRange && cnt>0){
+        const ratio = Math.min(cnt/config.total,1);
+        el.style.background = `rgba(166,169,227,${(0.12+ratio*0.55).toFixed(2)})`;
+      }
+      el.innerHTML = `${day}` + (inRange && cnt>0 ? `<span class="cnt">${cnt}명</span>` : '');
+      if(inRange) el.addEventListener('click', ()=>openDatePanel(dateStr));
+      grid.appendChild(el);
+    }
+    monthDiv.appendChild(grid);
+    wrap.appendChild(monthDiv);
+  });
+}
+
+function openDatePanel(dateStr){
+  openDateStr = dateStr;
+  document.querySelectorAll('.cal-day').forEach(el=>{
+    el.classList.toggle('open', el.dataset.date===dateStr);
+  });
+  const dObj = new Date(dateStr+'T00:00:00');
+  $('timePanelCard').style.display = 'block';
+  $('timePanelTitle').textContent = `${dObj.getMonth()+1}/${dObj.getDate()}(${dowLabel(dObj.getDay())}) 되는 시간`;
+  renderOptions(dateStr);
+  $('timePanelCard').scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+function renderOptions(dateStr){
+  if(!responses[myName]) responses[myName] = {};
+  if(!responses[myName][dateStr]) responses[myName][dateStr] = {anytime:false, hours:[]};
+
+  const grid = $('optGrid');
+  grid.innerHTML = '';
+  CATEGORIES.forEach(cat=>{
+    const btn = document.createElement('button');
+    btn.className = 'opt-btn';
+    btn.dataset.cat = cat.id;
+    btn.innerHTML = `<span class="lbl">${cat.label}</span><span class="desc">${cat.desc}</span><span class="cnt"></span>`;
+    btn.addEventListener('click', ()=>toggleCategory(dateStr, cat.id));
+    grid.appendChild(btn);
+  });
+  styleOptions(dateStr);
+
+  const customBox = $('customBox');
+  customBox.style.display = document.querySelector('.opt-btn[data-cat="custom"]')?.classList.contains('mine') ? 'block' : 'none';
+  renderHourGrid(dateStr);
+  renderCustomNote(dateStr);
+}
+
+function renderHourGrid(dateStr){
+  const grid = $('hourGrid');
+  grid.innerHTML = '';
+  for(let h=0; h<24; h++){
+    const btn = document.createElement('button');
+    btn.className = 'hour-btn';
+    btn.dataset.hour = h;
+    btn.innerHTML = `${h}시<span class="hcnt"></span>`;
+    btn.addEventListener('click', ()=>toggleHour(dateStr, h));
+    grid.appendChild(btn);
+  }
+  styleHourGrid(dateStr);
+}
+
+function styleHourGrid(dateStr){
+  const mySel = responses[myName] && responses[myName][dateStr];
+  const myHours = getHours(mySel);
+  document.querySelectorAll('.hour-btn').forEach(btn=>{
+    const h = parseInt(btn.dataset.hour);
+    let cnt = 0;
+    Object.values(responses).forEach(byDate=>{
+      if(getHours(byDate && byDate[dateStr]).includes(h)) cnt++;
+    });
+    btn.classList.toggle('mine', myHours.includes(h));
+    btn.querySelector('.hcnt').textContent = cnt>0 ? `${cnt}명` : '';
+  });
+}
+
+function toggleHour(dateStr, h){
+  if(!myName) return;
+  if(!responses[myName]) responses[myName] = {};
+  if(!responses[myName][dateStr]) responses[myName][dateStr] = {anytime:false, hours:[]};
+  const sel = responses[myName][dateStr];
+  if(!Array.isArray(sel.hours)) sel.hours = [];
+  const i = sel.hours.indexOf(h);
+  if(i === -1) sel.hours.push(h); else sel.hours.splice(i,1);
+  sel.hours.sort((a,b)=>a-b);
+  if(sel.hours.length) sel.anytime = false;
+  saveResponses();
+  styleHourGrid(dateStr);
+  styleOptions(dateStr);
+  renderCustomNote(dateStr);
+  updateNameButtonStyles();
+  renderCalendar();
+  renderBest();
+}
+
+function styleOptions(dateStr){
+  document.querySelectorAll('.opt-btn').forEach(btn=>{
+    const catId = btn.dataset.cat;
+    let cnt = 0;
+    Object.values(responses).forEach(byDate=>{
+      const v = byDate && byDate[dateStr];
+      if(!v) return;
+      if(catId==='custom' ? getHours(v).length>0 : v[catId]) cnt++;
+    });
+    const mySel = responses[myName] && responses[myName][dateStr];
+    let mine = false;
+    if(mySel){
+      if(catId === 'custom'){
+        mine = !!(mySel._customOn) || getHours(mySel).length>0;
+      } else {
+        mine = !!mySel[catId];
+      }
+    }
+    btn.classList.toggle('mine', mine);
+    btn.classList.toggle('full', !!(config.total>0 && cnt>=config.total));
+    btn.querySelector('.cnt').textContent = cnt>0 ? `${cnt}/${config.total}명` : '';
+  });
+}
+
+function renderCustomNote(dateStr){
+  const notes = [];
+  Object.entries(responses).forEach(([name,byDate])=>{
+    const v = byDate && byDate[dateStr];
+    const hs = getHours(v);
+    if(hs.length) notes.push(`<b>${name}</b> ${hs.map(h=>h+'시').join(', ')}`);
+  });
+  $('customNote').innerHTML = notes.length ? notes.join('<br>') : '';
+}
+
+function toggleCategory(dateStr, catId){
+  if(!myName) return;
+  if(!responses[myName]) responses[myName] = {};
+  if(!responses[myName][dateStr]) responses[myName][dateStr] = {anytime:false, hours:[]};
+  const sel = responses[myName][dateStr];
+
+  // '아무때나'와 '시간 선택'은 서로 배타적 — 하나 켜면 다른 쪽은 꺼진다
+  if(catId === 'custom'){
+    sel._customOn = !sel._customOn;
+    if(!sel._customOn){ sel.hours = []; }
+    else { sel.anytime = false; }
+  } else {
+    sel[catId] = !sel[catId];
+    if(sel[catId]){ sel._customOn = false; sel.hours = []; }
+  }
+  saveResponses();
+  styleOptions(dateStr);
+  const customBox = $('customBox');
+  customBox.style.display = sel._customOn ? 'block' : 'none';
+  if(sel._customOn) renderHourGrid(dateStr);
+  renderCustomNote(dateStr);
+  updateNameButtonStyles();
+  renderCalendar();
+  renderBest();
+}
+
+function renderBest(){
+  // 날짜별로 '아무때나' 인원과 시간별 인원을 따로 모은다
+  const byDate = {}; // dateStr -> { anytime:Set, hours:{h:Set} }
+  Object.entries(responses).forEach(([name, dates])=>{
+    Object.entries(dates||{}).forEach(([dateStr, v])=>{
+      if(!v) return;
+      if(!byDate[dateStr]) byDate[dateStr] = { anytime:new Set(), hours:{} };
+      const slot = byDate[dateStr];
+      if(v.anytime) slot.anytime.add(name);
+      getHours(v).forEach(h=>{
+        if(!slot.hours[h]) slot.hours[h] = new Set();
+        slot.hours[h].add(name);
+      });
+    });
+  });
+
+  // 실제로 겹치는 인원 계산
+  // 핵심: '아무때나' 고른 사람은 그 날의 모든 시간에 가능한 것으로 함께 센다
+  const rows = [];
+  Object.entries(byDate).forEach(([dateStr, slot])=>{
+    const hourKeys = Object.keys(slot.hours);
+    if(hourKeys.length === 0){
+      // 아무도 특정 시간을 안 골랐으면 날짜 단위로만 표시
+      if(slot.anytime.size > 0){
+        rows.push({ dateStr, hour:null, count: slot.anytime.size, anytimeOnly:true });
+      }
+      return;
+    }
+    hourKeys.forEach(hk=>{
+      const h = parseInt(hk);
+      const people = new Set([...slot.hours[hk], ...slot.anytime]);
+      rows.push({ dateStr, hour:h, count: people.size, plus: slot.anytime.size });
+    });
+  });
+
+  // 겹치는 인원 많은 순 → 같으면 빠른 날짜 → 같으면 빠른 시간
+  rows.sort((a,b)=>{
+    if(b.count !== a.count) return b.count - a.count;
+    if(a.dateStr !== b.dateStr) return a.dateStr < b.dateStr ? -1 : 1;
+    return (a.hour ?? -1) - (b.hour ?? -1);
+  });
+
+  const bestList = $('bestList');
+  if(rows.length === 0){
+    bestList.innerHTML = '<div class="empty">아직 선택된 시간이 없어요</div>';
+    return;
+  }
+
+  bestList.innerHTML = '';
+  rows.slice(0,6).forEach(r=>{
+    const dateObj = new Date(r.dateStr+'T00:00:00');
+    const when = r.hour === null ? '아무때나' : `${r.hour}시`;
+    const label = `${dateObj.getMonth()+1}/${dateObj.getDate()}(${dowLabel(dateObj.getDay())}) ${when}`;
+    const full = r.count >= config.total;
+    const div = document.createElement('div');
+    div.className = 'best-item';
+    div.innerHTML = `<span>${label}</span><b>${full ? '🎉 전원 가능' : `${r.count}/${config.total}명`}</b>`;
+    bestList.appendChild(div);
+  });
+}
+
+async function refreshAll(force){
+  // 방금 편집했거나 저장 중이면 서버 값으로 덮어쓰지 않는다
+  if(!force && (saving || Date.now() - lastLocalEdit < 3000)) return;
+  await loadResponses();
+  updateNameButtonStyles();
+  renderCalendar();
+  if(openDateStr) renderOptions(openDateStr);
+  renderBest();
+}
+
+async function init(){
+  $('eventTitle').textContent = config.title;
+  await loadResponses();
+  renderNameButtons();
+  renderBest();
+
+  $('closeTimePanel').addEventListener('click', ()=>{
+    $('timePanelCard').style.display = 'none';
+    openDateStr = null;
+    renderCalendar();
+  });
+
+  // 샌드박스에서 confirm()이 차단되므로 두 번 누르기로 확인받는다
+  let clearArmed = false, clearTimer = null;
+  const clearBtn = $('clearMine');
+  const resetClearBtn = ()=>{
+    clearArmed = false;
+    clearTimer = null;
+    clearBtn.textContent = '내 선택 전체 지우기';
+    clearBtn.classList.remove('danger');
+  };
+  clearBtn.addEventListener('click', async ()=>{
+    if(!myName){ return; }
+    if(!clearArmed){
+      clearArmed = true;
+      clearBtn.textContent = '정말 지울까요? (한 번 더)';
+      clearBtn.classList.add('danger');
+      clearTimer = setTimeout(resetClearBtn, 4000);
+      return;
+    }
+    clearTimeout(clearTimer);
+    resetClearBtn();
+    responses[myName] = {};
+    await saveResponses();
+    updateNameButtonStyles();
+    renderCalendar();
+    if(openDateStr) renderOptions(openDateStr);
+    renderBest();
+  });
+
+  $('refreshBtn').addEventListener('click', ()=>refreshAll(true));
+
+  setInterval(()=>refreshAll(false), 8000);
+}
+
+init();
+</script>
+</body>
+</html>
