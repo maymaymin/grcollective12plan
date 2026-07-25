@@ -531,30 +531,37 @@ function renderCalendar(){
     });
     const firstDow = new Date(y,m,1).getDay();
     const daysInMonth = new Date(y,m+1,0).getDate();
-    for(let i=0;i<firstDow;i++){
+
+    // 이 달에서 실제로 보여줄 범위 (시작일/종료일 밖은 아예 숨김)
+    const isStartMonth = (y===start.getFullYear() && m===start.getMonth());
+    const isEndMonth   = (y===end.getFullYear() && m===end.getMonth());
+    const firstVisibleDay = isStartMonth ? start.getDate() : 1;
+    const lastVisibleDay  = isEndMonth ? end.getDate() : daysInMonth;
+
+    // 첫 표시일의 요일에 맞춰 빈 칸 채우기
+    const firstVisibleDow = new Date(y,m,firstVisibleDay).getDay();
+    for(let i=0;i<firstVisibleDow;i++){
       const el = document.createElement('div'); el.className='cal-day empty';
       grid.appendChild(el);
     }
-    for(let day=1; day<=daysInMonth; day++){
+    for(let day=firstVisibleDay; day<=lastVisibleDay; day++){
       const dObj = new Date(y,m,day);
       const dateStr = `${y}-${pad(m+1)}-${pad(day)}`;
-      const inRange = dObj>=new Date(start.getFullYear(),start.getMonth(),start.getDate()) && dObj<=new Date(end.getFullYear(),end.getMonth(),end.getDate());
       const el = document.createElement('div');
-      el.className = 'cal-day' + (inRange?'':' disabled');
-      if(!inRange) el.style.opacity = '.25';
+      el.className = 'cal-day';
       el.dataset.date = dateStr;
-      const cnt = inRange ? dateAvailCount(dateStr) : 0;
+      const cnt = dateAvailCount(dateStr);
       const myV = responses[myName] && responses[myName][dateStr];
       const mine = hasPick(myV);
       if(mine) el.classList.add('mine');
       if(config.total>0 && cnt>=config.total) el.classList.add('full');
       if(openDateStr===dateStr) el.classList.add('open');
-      if(inRange && cnt>0){
+      if(cnt>0){
         const ratio = Math.min(cnt/config.total,1);
         el.style.background = `rgba(166,169,227,${(0.12+ratio*0.55).toFixed(2)})`;
       }
-      el.innerHTML = `${day}` + (inRange && cnt>0 ? `<span class="cnt">${cnt}명</span>` : '');
-      if(inRange) el.addEventListener('click', ()=>openDatePanel(dateStr));
+      el.innerHTML = `${day}` + (cnt>0 ? `<span class="cnt">${cnt}명</span>` : '');
+      el.addEventListener('click', ()=>openDatePanel(dateStr));
       grid.appendChild(el);
     }
     monthDiv.appendChild(grid);
