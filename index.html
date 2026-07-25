@@ -100,6 +100,12 @@
     margin-bottom:14px;
     box-shadow:0 2px 10px -4px rgba(46,51,72,0.10);
   }
+  .card.nudge{animation:nudge .45s ease 2;border-color:var(--sel-deep);}
+  @keyframes nudge{
+    0%,100%{transform:translateX(0);}
+    25%{transform:translateX(-6px);}
+    75%{transform:translateX(6px);}
+  }
 
   button{
     border:none;border-radius:10px;
@@ -227,15 +233,15 @@
 
   <div class="frame-label">SCHEDULE ROLL</div>
   <h1 id="eventTitle">뒷풀이 일정 정하기!</h1>
-  <div class="sub">이름 고르고 → 달력에서 날짜 탭 → 되는 시간 탭! 끝나면 이름 버튼에 체크가 떠요</div>
+  <div class="sub">결과는 누구나 바로 볼 수 있어요 · 내 시간을 넣으려면 이름부터 골라줘요</div>
 
   <!-- 이름 선택 -->
-  <div class="card">
+  <div class="card" id="nameCard">
     <div class="card-title">누구세요? <span class="hint" id="doneCount"></span></div>
     <div class="name-grid" id="nameGrid"></div>
   </div>
 
-  <div id="mainArea" style="display:none;">
+  <div id="mainArea">
 
     <div class="card" id="calendarCard">
       <div class="card-title" id="calHint">되는 날짜를 탭해줘요</div>
@@ -448,7 +454,6 @@ function updateNameButtonStyles(){
 function selectName(n){
   myName = n;
   if(!responses[myName]) responses[myName] = {};
-  $('mainArea').style.display = 'block';
   updateNameButtonStyles();
   renderCalendar();
   if(openDateStr) openDatePanel(openDateStr);
@@ -528,7 +533,19 @@ function renderCalendar(){
   });
 }
 
+function nudgeNamePick(){
+  const card = document.getElementById('nameCard');
+  if(!card) return;
+  card.scrollIntoView({behavior:'smooth', block:'center'});
+  card.classList.add('nudge');
+  setTimeout(()=>card.classList.remove('nudge'), 900);
+}
+
 function openDatePanel(dateStr){
+  if(!myName){
+    nudgeNamePick();
+    return;
+  }
   openDateStr = dateStr;
   document.querySelectorAll('.cal-day').forEach(el=>{
     el.classList.toggle('open', el.dataset.date===dateStr);
@@ -744,6 +761,7 @@ async function init(){
   $('eventTitle').textContent = config.title;
   await loadResponses();
   renderNameButtons();
+  renderCalendar();
   renderBest();
 
   $('closeTimePanel').addEventListener('click', ()=>{
